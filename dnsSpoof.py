@@ -55,10 +55,10 @@ def packetExtract(packet):
     #If you wanted to check on the Ethernet layer for a DNS packet - type: 2048
     if packet.haslayer(DNS):
         if packet[DNS].qr == 0:
+            #DNS field qr = 1 indicates it's a DNS response
+            #DNS field aa = 1 indicates it the response is definitive. (Authoritative Answer)
             dnsResponse = IP(dst=packet[IP].src, src=packet[IP].dst)/\
                         UDP(dport=packet[UDP].sport, sport=packet[UDP].dport)/\
-                        #qr = 1 indicates it's a DNS response
-                        #aa = 1 indicates it should override any other DNS response (router)
                         DNS(id=packet[DNS].id, qd=packet[DNS].qd, aa=1, qr=1,\
                         #DNSRR = DNS Resource Record (vs DNQR, Question Record)
                         #Copy the DNS requests' DNS info to the response.
