@@ -1,6 +1,0 @@
-* Flush all the firewall rules
-  iptables -X
-  iptables -F
-
-* Install python library "scapy"
-  pip install scapy
