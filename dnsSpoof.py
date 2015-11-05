@@ -81,7 +81,6 @@ def getMAC(ip):
 def arpPoison():
     routerMac = getMAC(args.routerIP)
     targetMac = getMAC(args.targetIP)
-    print "Now ARP poisoning target machine: %s and router: %s ..." % (args.targetIP, args.routerIP)
     while True:
         #Resend the ARP response packets every 2 seconds
         time.sleep(2)
@@ -154,11 +153,13 @@ def main():
     arpThread = threading.Thread(target=arpPoison)
     arpThread.daemon = True
     arpThread.start()
+    print "Now ARP poisoning target machine: %s and router: %s ..." % (args.targetIP, args.routerIP)
 
     #Spoof DNS traffic from target machine.
     dnsThread = threading.Thread(target=dnsSniff)
     dnsThread.daemon = True
     dnsThread.start()
+    print "Now spoofing DNS reponses for target machine: %s ..." %args.targetIP
     
     # main thread
     while True:
